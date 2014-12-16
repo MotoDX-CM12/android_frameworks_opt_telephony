@@ -235,9 +235,14 @@ public final class DcTracker extends DcTrackerBase {
         if (DBG) log(LOG_TAG + ".constructor");
 
         if (p.getPhoneType() == PhoneConstants.PHONE_TYPE_CDMA) {
-            mOmhApt = new CdmaApnProfileTracker((CDMAPhone)p);
-            mOmhApt.registerForModemProfileReady(this,
-                    DctConstants.EVENT_MODEM_DATA_PROFILE_READY, null);
+            final boolean fetchApnFromOmhCard = p.getContext().getResources().
+                    getBoolean(com.android.internal.R.bool.config_fetch_apn_from_omh_card);
+            log(LOG_TAG + " fetchApnFromOmhCard: " + fetchApnFromOmhCard);
+            if (fetchApnFromOmhCard) {
+                mOmhApt = new CdmaApnProfileTracker((CDMAPhone)p);
+                mOmhApt.registerForModemProfileReady(this,
+                        DctConstants.EVENT_MODEM_DATA_PROFILE_READY, null);
+            }
         }
 
         mDataConnectionTracker = this;
@@ -565,6 +570,13 @@ public final class DcTracker extends DcTrackerBase {
             if(!isNetworkRequestForInternet(n)) {
                 SubscriptionController subController = SubscriptionController.getInstance();
                 subController.stopOnDemandDataSubscriptionRequest(n);
+            } else {
+                // Internet requests are not queued in DDS list. So deactivate here explicitly.
+                ApnContext apnContext = apnContextForNetworkRequest(n);
+                if (apnContext != null) {
+                    log("Deactivating APN=" + apnContext);
+                    apnContext.decRefCount();
+                }
             }
         }
 
@@ -3050,13 +3062,13 @@ public final class DcTracker extends DcTrackerBase {
 
         log("setPreferredApn: delete");
         ContentResolver resolver = mPhone.getContext().getContentResolver();
-        resolver.delete(PREFERAPN_NO_UPDATE_URI, null, null);
+        resolver.delete(getUri(PREFERAPN_NO_UPDATE_URI), null, null);
 
         if (pos >= 0) {
             log("setPreferredApn: insert");
             ContentValues values = new ContentValues();
             values.put(APN_ID, pos);
-            resolver.insert(PREFERAPN_NO_UPDATE_URI, values);
+            resolver.insert(getUri(PREFERAPN_NO_UPDATE_URI), values);
         }
     }
 
@@ -3067,7 +3079,7 @@ public final class DcTracker extends DcTrackerBase {
         }
 
         Cursor cursor = mPhone.getContext().getContentResolver().query(
-                PREFERAPN_NO_UPDATE_URI, new String[] { "_id", "name", "apn" },
+                getUri(PREFERAPN_NO_UPDATE_URI), new String[] { "_id", "name", "apn" },
                 null, null, Telephony.Carriers.DEFAULT_SORT_ORDER);
 
         if (cursor != null) {
@@ -3579,4 +3591,9 @@ public final class DcTracker extends DcTrackerBase {
             }
         }
     }
+
+    private Uri getUri(Uri uri) {
+        return Uri.withAppendedPath(uri, "/subId/" + mSubId);
+    }
+
 }

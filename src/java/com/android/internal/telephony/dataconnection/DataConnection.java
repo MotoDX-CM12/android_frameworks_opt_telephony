@@ -567,11 +567,28 @@ public final class DataConnection extends StateMachine {
         }
 
         mPhone.mCi.setupDataCall(
-                Integer.toString(cp.mRilRat + 2),
+                getDataTechnology(cp.mRilRat),
                 Integer.toString(dataProfileId),
                 mApnSetting.apn, mApnSetting.user, mApnSetting.password,
                 Integer.toString(authType),
                 protocol, msg);
+    }
+
+    /**
+     * Get the technology that will be used to setup the data connection.
+     *
+     * @param radioTechnology is the ril radio technology.
+     */
+    private String getDataTechnology(int radioTechnology) {
+        int dataTechnology = radioTechnology + 2;
+        if (mPhone.mCi.getRilVersion() < 5) {
+            if (ServiceState.isGsm(radioTechnology)) {
+                dataTechnology = RILConstants.SETUP_DATA_TECH_GSM;
+            } else if (ServiceState.isCdma(radioTechnology)) {
+                dataTechnology = RILConstants.SETUP_DATA_TECH_CDMA;
+            }
+        }
+        return Integer.toString(dataTechnology);
     }
 
     /**
