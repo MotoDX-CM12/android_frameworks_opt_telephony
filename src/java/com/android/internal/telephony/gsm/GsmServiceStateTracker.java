@@ -840,6 +840,16 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
                 case EVENT_POLL_STATE_NETWORK_SELECTION_MODE: {
                     ints = (int[])ar.result;
                     mNewSS.setIsManualSelection(ints[0] == 1);
+                    if ((ints[0] == 1) && (!mPhone.isManualNetSelAllowed())) {
+                        /*
+                         * modem is currently in manual selection but manual
+                         * selection is not allowed in the current mode so
+                         * switch to automatic registration
+                         */
+                        mPhone.setNetworkSelectionModeAutomatic (null);
+                        log(" Forcing Automatic Network Selection, " +
+                                "manual selection is not allowed");
+                    }
                     break;
                 }
             }
@@ -1729,6 +1739,14 @@ final class GsmServiceStateTracker extends ServiceStateTracker {
             if (nitzSubs.length >= 9) {
                 String  tzname = nitzSubs[8].replace('!','/');
                 zone = TimeZone.getTimeZone( tzname );
+                // From luni's getTimeZone() "We never return null; on failure we return the
+                // equivalent of "GMT"." This is bad, since it'll force all invalid strings
+                // to "GMT"... and all the null-zone checks below will fail, making tzOffset
+                // irrelevant and GMT the active TZ. So tzOffset will take precedence if this
+                // results in "GMT"
+                if (TimeZone.getTimeZone("GMT").equals(zone) && tzOffset != 0) {
+                    zone = null;
+                }
             }
 
             String iso = getSystemProperty(TelephonyProperties.PROPERTY_OPERATOR_ISO_COUNTRY, "");
